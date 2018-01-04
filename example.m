@@ -1,0 +1,60 @@
+%% add path
+addpath('src')
+
+%% stimulate data
+A.data = rand(10,1000);
+A.fs = 10;
+A.time = linspace(0,100,1000);
+A.idx = 1:10;
+A.imp = 1e4*ones(10,1);
+A.file = 'sim_data';
+A.adc = zeros(size(A.time));
+A.adc_fs = 10;
+
+% gen triggers
+trig_num = 12;
+type = zeros(trig_num,1);
+for i=1:trig_num
+    a = i*40+15;
+    b = a + 5;
+    A.adc(a:b) = 1;
+    type(i) = round(rand())+1;
+    if i > 10
+        type(i) = 0;
+    end
+end
+
+% verify 
+subplot(2,1,1), plot(A.time, A.data(1,:))
+subplot(2,1,2), plot(A.time, A.adc)
+
+%% epoch 
+ecfg.range = [-1 1];
+Tr = epoch_continous(A, ecfg);
+
+%% label epochs
+for i=1:numel(type)
+    Tr.type(i) = type(i);
+end
+
+%% car
+car = mean(Tr.data,3);
+Tr1 = Tr;
+Tr1.data = Tr.data - repmat(car,1,1,numel(Tr.idx));
+
+%% highpass filter
+fcfg.range = [1 3];
+fcfg.invert = 0;
+Tr2 = epoch_filt(Tr1, fcfg);
+
+%% time select
+tcfg.range = [-0.5 0.5];
+Tr3 = epoch_ts(Tr2, tcfg);
+
+%% recitify signal
+
+Tr3.data = abs(Tr3.data);
+
+%% plot 
+figure, plot(Tr3.time, squeeze(mean(Tr3.data,1))') %trial average
+
