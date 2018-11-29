@@ -12,5 +12,7 @@ if and(isfield(Tr,'target'),0) %bypass for now
     Tr.target = Tr.target(kp,:);
 end
 
-
+if isfield(Tr,'gtime')
+    Tr.gtime = Tr.gtime(kp);
+end
 end

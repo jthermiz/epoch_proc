@@ -1,22 +1,38 @@
 function Tr = epoch_continous(A, cfg)
-%convert continuous data structure to trialized data structure. 
-%This is done by thresholding trigger line A.adc to find trial onset times. 
+%convert continuous data structure to trialized data structure.
+%This is done by thresholding trigger line A.adc to find trial onset times.
 %cfg.range is used to specific the window of the trial about the onset time.
 %Example:
-    % ecfg.range  = [-2 2];
-    % Tr = epoch_continous(A, ecfg);
+% ecfg.range  = [-2 2];
+% Tr = epoch_continous(A, ecfg);
 
 %Trialize data based on adc
 
 pre = -1*cfg.range(1)*A.fs; %convert to samples
 post = cfg.range(2)*A.fs; %convert to samples
 n = pre + post;
-thres = max(A.adc)/2;
 
+if isfield(cfg,'stim')
+    ytmp = cfg.stim;
+    y = ytmp;
+    
+    for i=1:numel(ytmp)
+        [~,y(i)] = min(abs(A.time - ytmp(i))); %convert from sec to samp idx
+    end
+else
+    thres = cfg.thres;
+    x = (A.adc - thres);
+    x1 = x.*[x(2:end) 0];
+    y = find(and(x1 < 0, x < 0));
+    
+    %add refrac period of 0.3 sec
+    dy = diff(y);
+    kp = dy > A.fs*0.3;
+    kp = [true kp];
+    y = y(kp);
+end
 
-x = (A.adc - thres);
-x1 = x.*[x(2:end) 0];
-y = find(and(x1 < 0, x < 0));
+gtimebool = isfield(A,'gtime');
 
 ch_num = size(A.data,1);
 tr_num = numel(y);
@@ -29,6 +45,9 @@ Tr.idx = A.idx;
 Tr.imp = A.imp;
 Tr.fs = A.fs;
 
+if gtimebool
+    Tr.gtime = repmat(duration(0,0,0),256,1);
+end
 
 for i=1:tr_num
     
@@ -39,10 +58,14 @@ for i=1:tr_num
     catch
         disp('err')
     end
-    Tr.atime(i) = A.time(y(i));   
+    Tr.atime(i) = A.time(y(i));
+    
+    if gtimebool
+        Tr.gtime(i) = A.gtime(y(i));
+    end
     
 end
 
 %remove all invalid trials
-rcfg.kp = ~isnan(Tr.data(:,1,1));
-Tr = epoch_trs(Tr, rcfg);
+% rcfg.kp = ~isnan(Tr.data(:,1,1)); %re-instate?
+% Tr = epoch_trs(Tr, rcfg);
